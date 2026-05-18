@@ -1,0 +1,15 @@
+{
+  "name": "shopping-list-app",
+  "version": "1.0.0",
+  "description": "쇼핑 리스트 웹 앱 - 다크 모드, localStorage 지원",
+  "scripts": {
+    "test": "node shopping-list.test.js"
+  },
+  "keywords": ["shopping", "list", "webapp"],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.60.0"
+  }
+}
