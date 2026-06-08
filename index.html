@@ -257,8 +257,13 @@
     </button>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script>
-    let items = JSON.parse(localStorage.getItem('shopping-items') || '[]');
+    const SUPABASE_URL = 'https://evhwdeovehxauueottad.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV2aHdkZW92ZWh4YXV1ZW90dGFkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MTYxMzgsImV4cCI6MjA5NjQ5MjEzOH0.6ouWpxBDbf6KE8p0xkpPL639ZSxI7cUHGTfjMtai1uI';
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let items = [];
 
     const isDark = localStorage.getItem('shopping-theme') === 'dark';
     if (isDark) document.body.classList.add('dark');
@@ -268,10 +273,6 @@
       const dark = document.body.classList.toggle('dark');
       localStorage.setItem('shopping-theme', dark ? 'dark' : 'light');
       document.getElementById('theme-btn').textContent = dark ? '☀️' : '🌙';
-    }
-
-    function save() {
-      localStorage.setItem('shopping-items', JSON.stringify(items));
     }
 
     function render() {
@@ -292,42 +293,88 @@
       summary.innerHTML = `총 <span>${total}</span>개 · 완료 <span>${done}</span>개`;
       clearBtn.style.display = done > 0 ? 'block' : 'none';
 
-      list.innerHTML = items.map((item, idx) => `
+      list.innerHTML = items.map(item => `
         <li class="${item.checked ? 'checked' : ''}">
-          <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggle(${idx})" />
+          <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggle('${item.id}')" />
           <span class="item-name">${escapeHtml(item.name)}</span>
-          <button class="delete-btn" onclick="remove(${idx})" title="삭제">✕</button>
+          <button class="delete-btn" onclick="remove('${item.id}')" title="삭제">✕</button>
         </li>
       `).join('');
     }
 
-    function addItem() {
+    async function loadItems() {
+      document.getElementById('list').innerHTML = '<div class="empty">불러오는 중...</div>';
+
+      const { data, error } = await db
+        .from('shopping_items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        document.getElementById('list').innerHTML = '<div class="empty">데이터를 불러오지 못했습니다.</div>';
+        return;
+      }
+
+      items = data;
+      render();
+    }
+
+    async function addItem() {
       const input = document.getElementById('item-input');
       const name = input.value.trim();
       if (!name) return;
 
-      items.unshift({ name, checked: false });
       input.value = '';
-      save();
-      render();
+
+      const { data, error } = await db
+        .from('shopping_items')
+        .insert({ name, checked: false })
+        .select()
+        .single();
+
+      if (!error) {
+        items.unshift(data);
+        render();
+      }
     }
 
-    function toggle(idx) {
-      items[idx].checked = !items[idx].checked;
-      save();
-      render();
+    async function toggle(id) {
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+
+      const { error } = await db
+        .from('shopping_items')
+        .update({ checked: !item.checked })
+        .eq('id', id);
+
+      if (!error) {
+        item.checked = !item.checked;
+        render();
+      }
     }
 
-    function remove(idx) {
-      items.splice(idx, 1);
-      save();
-      render();
+    async function remove(id) {
+      const { error } = await db
+        .from('shopping_items')
+        .delete()
+        .eq('id', id);
+
+      if (!error) {
+        items = items.filter(i => i.id !== id);
+        render();
+      }
     }
 
-    function clearChecked() {
-      items = items.filter(i => !i.checked);
-      save();
-      render();
+    async function clearChecked() {
+      const { error } = await db
+        .from('shopping_items')
+        .delete()
+        .eq('checked', true);
+
+      if (!error) {
+        items = items.filter(i => !i.checked);
+        render();
+      }
     }
 
     function escapeHtml(str) {
@@ -338,7 +385,7 @@
       if (e.key === 'Enter') addItem();
     });
 
-    render();
+    loadItems();
   </script>
 </body>
 </html>
